@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
       {
         error: 'Failed to send message',
         details: error instanceof Error ? error.message : 'Unknown error',
-        emailConfigured: !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS)
+        emailConfigured: !!process.env.RESEND_API_KEY
       },
       { status: 500 }
     )

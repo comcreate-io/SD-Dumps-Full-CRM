@@ -1,45 +1,12 @@
-import nodemailer from 'nodemailer'
+import { sendEmail } from '@/lib/resend'
 
-// Check if SMTP is configured
-const isEmailConfigured = !!(
-  process.env.SMTP_HOST &&
-  process.env.SMTP_USER &&
-  process.env.SMTP_PASS
-)
-
-// Create transporter only if configured
-let transporter: nodemailer.Transporter | null = null
+// Check if Resend is configured
+const isEmailConfigured = !!process.env.RESEND_API_KEY
 
 if (isEmailConfigured) {
-  console.log('📧 Configuring email with:', {
-    host: process.env.SMTP_HOST,
-    port: process.env.SMTP_PORT,
-    user: process.env.SMTP_USER,
-    from: process.env.SMTP_FROM,
-  })
-
-  transporter = nodemailer.createTransport({
-    service: 'gmail', // Use Gmail service configuration
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  })
-
-  // Verify connection (non-blocking - don't fail if verification fails)
-  transporter.verify((error: any) => {
-    if (error) {
-      console.error('❌ Email verification failed (emails will still be attempted):', error.message)
-      console.error('   Make sure you have:')
-      console.error('   1. Enabled 2-Step Verification on your Google Account')
-      console.error('   2. Generated an App Password at https://myaccount.google.com/apppasswords')
-      console.error('   3. Used the App Password (not your regular password) in SMTP_PASS')
-    } else {
-      console.log('✅ Email server is ready to send messages')
-    }
-  })
+  console.log('📧 Email configured with Resend API')
 } else {
-  console.warn('⚠️ Email not configured - emails will be skipped')
+  console.warn('⚠️ Email not configured - RESEND_API_KEY missing, emails will be skipped')
 }
 
 // Pricing breakdown interface
@@ -197,14 +164,13 @@ function generateGuestInquiryEmail(data: GuestInquiryEmailData): string {
 }
 
 export async function sendGuestInquiryEmail(data: GuestInquiryEmailData) {
-  if (!transporter) {
+  if (!isEmailConfigured) {
     console.warn('⚠️ Email not configured - skipping guest inquiry email')
     return { success: true, skipped: true, reason: 'Email not configured' }
   }
 
-  await transporter.sendMail({
-    from: `"SD Dumping Solutions" <${process.env.SMTP_FROM}>`,
-    to: process.env.CONTACT_EMAIL,
+  await sendEmail({
+    to: process.env.CONTACT_EMAIL!,
     subject: `New Guest Booking Request`,
     html: generateGuestInquiryEmail(data),
     replyTo: data.customerEmail,
@@ -256,14 +222,13 @@ function generateContactFormEmail(data: ContactFormData): string {
 
 // Send contact form email
 export async function sendContactFormEmail(data: ContactFormData) {
-  if (!transporter) {
+  if (!isEmailConfigured) {
     console.warn('⚠️ Email not configured - skipping contact form email')
     return { success: true, skipped: true, reason: 'Email not configured' }
   }
 
-  await transporter.sendMail({
-    from: `"SD Dumping Solutions Contact Form" <${process.env.SMTP_FROM}>`,
-    to: process.env.CONTACT_EMAIL,
+  await sendEmail({
+    to: process.env.CONTACT_EMAIL!,
     subject: `New Contact Form Submission from ${data.firstName} ${data.lastName}`,
     html: generateContactFormEmail(data),
     replyTo: data.email,
@@ -306,7 +271,7 @@ export function generateClientEmail(data: BookingEmailData): string {
     <div class="content">
       <p style="font-size: 16px; margin-top: 0;">Hi <strong>${data.customerName}</strong>,</p>
       <p>Your container rental has been successfully booked! Here are your booking details:</p>
-      
+
       <div class="card">
         <h2>📦 Booking Information</h2>
         <div class="detail-row">
@@ -328,7 +293,7 @@ export function generateClientEmail(data: BookingEmailData): string {
         </div>
         ` : ''}
       </div>
-      
+
       <div class="card">
         <h2>📅 Rental Period</h2>
         <div class="detail-row">
@@ -346,7 +311,7 @@ export function generateClientEmail(data: BookingEmailData): string {
         </div>
         ` : ''}
       </div>
-      
+
       ${data.notes ? `
       <div class="card">
         <h2>📝 Additional Notes</h2>
@@ -370,17 +335,17 @@ export function generateClientEmail(data: BookingEmailData): string {
       <p style="text-align: center; margin: 30px 0 10px 0;">
         <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://www.sddumpingsolutions.com'}/bookings" class="button">View My Bookings</a>
       </p>
-      
+
       <p style="color: #6b7280; font-size: 14px;">
         If you have any questions or need to make changes to your booking, please don't hesitate to contact us.
       </p>
     </div>
-    
+
     <div class="footer">
       <p><strong>SD Dumping Solutions</strong></p>
       <p>Professional Waste Management Services</p>
       <p style="margin: 10px 0;">
-        📧 ${process.env.SMTP_FROM} | 📞 Contact Us
+        📧 ${process.env.EMAIL_FROM} | 📞 Contact Us
       </p>
       <p style="font-size: 12px; color: #9ca3af;">
         This is an automated message. Please do not reply directly to this email.
@@ -427,7 +392,7 @@ export function generateAdminEmail(data: BookingEmailData): string {
       <div class="alert">
         <p style="margin: 0; font-weight: bold;">⚠️ A new booking has been created and requires your attention.</p>
       </div>
-      
+
       <div class="card">
         <h2>📦 Booking Details</h2>
         <div class="detail-row">
@@ -451,7 +416,7 @@ export function generateAdminEmail(data: BookingEmailData): string {
           <span class="value" style="color: #059669; font-weight: bold;">$${data.totalAmount.toFixed(2)}</span>
         </div>
       </div>
-      
+
       <div class="card">
         <h2>👤 Customer Information</h2>
         <div class="detail-row">
@@ -463,7 +428,7 @@ export function generateAdminEmail(data: BookingEmailData): string {
           <span class="value">${data.customerEmail}</span>
         </div>
       </div>
-      
+
       <div class="card">
         <h2>📅 Schedule</h2>
         <div class="detail-row">
@@ -487,7 +452,7 @@ export function generateAdminEmail(data: BookingEmailData): string {
         </div>
         ` : ''}
       </div>
-      
+
       ${data.notes ? `
       <div class="card">
         <h2>📝 Customer Notes</h2>
@@ -511,7 +476,7 @@ export function generateAdminEmail(data: BookingEmailData): string {
         </ul>
       </div>
     </div>
-    
+
     <div class="footer">
       <p><strong>SD Dumping Solutions Admin Panel</strong></p>
       <p style="font-size: 12px; color: #9ca3af;">
@@ -526,16 +491,14 @@ export function generateAdminEmail(data: BookingEmailData): string {
 
 // Send booking confirmation emails
 export async function sendBookingEmails(data: BookingEmailData) {
-  // If email is not configured, skip sending
-  if (!transporter) {
+  if (!isEmailConfigured) {
     console.warn('⚠️ Email not configured - skipping email notification')
     return { success: true, skipped: true, reason: 'Email not configured' }
   }
 
   try {
     // Send email to client (with CC to admin emails)
-    await transporter.sendMail({
-      from: `"SD Dumping Solutions" <${process.env.SMTP_FROM}>`,
+    await sendEmail({
       to: data.customerEmail,
       cc: ['sandiegodumpingsolutions@gmail.com', 'diego@comcreate.org'],
       subject: `Booking Confirmed - Order #${data.bookingId.slice(0, 8)}`,
@@ -544,9 +507,8 @@ export async function sendBookingEmails(data: BookingEmailData) {
     console.log('✅ Client email sent to:', data.customerEmail)
 
     // Send email to admin
-    await transporter.sendMail({
-      from: `"SD Dumping Solutions Notifications" <${process.env.SMTP_FROM}>`,
-      to: process.env.CONTACT_EMAIL,
+    await sendEmail({
+      to: process.env.CONTACT_EMAIL!,
       subject: `🔔 New Booking Alert - #${data.bookingId.slice(0, 8)}`,
       html: generateAdminEmail(data),
     })
@@ -666,7 +628,7 @@ function generatePhoneBookingCustomerEmail(data: PhoneBookingEmailData): string 
       <p><strong>SD Dumping Solutions</strong></p>
       <p>Professional Waste Management Services</p>
       <p style="margin: 10px 0;">
-        📧 ${process.env.SMTP_FROM} | 📞 Contact Us
+        📧 ${process.env.EMAIL_FROM} | 📞 Contact Us
       </p>
       <p style="font-size: 12px; color: #9ca3af;">
         This is an automated message. Please do not reply directly to this email.
@@ -784,14 +746,13 @@ function generatePhoneBookingCompletedEmail(data: {
 
 // Send phone booking payment link email
 export async function sendPhoneBookingEmail(data: PhoneBookingEmailData) {
-  if (!transporter) {
+  if (!isEmailConfigured) {
     console.warn('⚠️ Email not configured - skipping phone booking email')
     return { success: true, skipped: true, reason: 'Email not configured' }
   }
 
   try {
-    await transporter.sendMail({
-      from: `"SD Dumping Solutions" <${process.env.SMTP_FROM}>`,
+    await sendEmail({
       to: data.customerEmail,
       cc: ['sandiegodumpingsolutions@gmail.com', 'diego@comcreate.org'],
       subject: `Complete Your Booking - Action Required`,
@@ -814,15 +775,14 @@ export async function sendPhoneBookingCompletedEmail(data: {
   containerType: string
   totalAmount: number
 }) {
-  if (!transporter) {
+  if (!isEmailConfigured) {
     console.warn('⚠️ Email not configured - skipping phone booking completion email')
     return { success: true, skipped: true, reason: 'Email not configured' }
   }
 
   try {
-    await transporter.sendMail({
-      from: `"SD Dumping Solutions Notifications" <${process.env.SMTP_FROM}>`,
-      to: process.env.CONTACT_EMAIL,
+    await sendEmail({
+      to: process.env.CONTACT_EMAIL!,
       subject: `✅ Phone Booking Completed - #${data.bookingId.slice(0, 8)}`,
       html: generatePhoneBookingCompletedEmail(data),
     })
@@ -945,14 +905,13 @@ export async function sendCustomerConfirmationEmail(data: {
   endDate: string
   totalAmount: number
 }) {
-  if (!transporter) {
+  if (!isEmailConfigured) {
     console.warn('⚠️ Email not configured - skipping customer confirmation email')
     return { success: true, skipped: true, reason: 'Email not configured' }
   }
 
   try {
-    await transporter.sendMail({
-      from: `"SD Dumping Solutions" <${process.env.SMTP_FROM}>`,
+    await sendEmail({
       to: data.customerEmail,
       cc: ['sandiegodumpingsolutions@gmail.com', 'diego@comcreate.org'],
       subject: `✅ Booking Confirmed - #${data.bookingId.slice(0, 8)}`,
@@ -1061,48 +1020,27 @@ function generatePaymentReceiptEmail(data: {
   `
 }
 
-// Send payment receipt email to customer
-export async function sendPaymentReceiptEmail(data: {
+// Send cancellation email to customer
+export async function sendCancellationEmail(data: {
   customerName: string
   customerEmail: string
-  bookingId: string
-  amount: number
-  description: string
-  transactionId: string
-  chargedDate: string
-}) {
-  if (!transporter) {
-    console.warn('⚠️ Email not configured - skipping payment receipt email')
-    return { success: true, skipped: true, reason: 'Email not configured' }
-  }
-
-  try {
-    await transporter.sendMail({
-      from: `"SD Dumping Solutions" <${process.env.SMTP_FROM}>`,
-      to: data.customerEmail,
-      cc: ['sandiegodumpingsolutions@gmail.com', 'diego@comcreate.org'],
-      subject: `💳 Payment Receipt - $${data.amount.toFixed(2)} - Booking #${data.bookingId.slice(0, 8)}`,
-      html: generatePaymentReceiptEmail(data),
-    })
-    console.log('✅ Payment receipt email sent to:', data.customerEmail)
-
-    return { success: true }
-  } catch (error) {
-    console.error('❌ Error sending payment receipt email:', error)
-    throw error
-  }
-}
-
-// Generate booking cancellation email HTML
-function generateCancellationEmail(data: {
-  customerName: string
   bookingId: string
   containerType: string
   startDate: string
   endDate: string
   reason?: string
 }) {
-  return `
+  if (!isEmailConfigured) {
+    console.warn('⚠️ Email not configured - skipping cancellation email')
+    return { success: true, skipped: true, reason: 'Email not configured' }
+  }
+
+  try {
+    await sendEmail({
+      to: data.customerEmail,
+      cc: ['sandiegodumpingsolutions@gmail.com', 'diego@comcreate.org'],
+      subject: `Booking Cancelled - #${data.bookingId.slice(0, 8)}`,
+      html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -1119,8 +1057,6 @@ function generateCancellationEmail(data: {
     .detail-row:last-child { border-bottom: none; }
     .label { font-weight: bold; color: #6b7280; }
     .value { color: #111827; }
-    .alert { background: #fee2e2; border-left: 4px solid #dc2626; padding: 15px; border-radius: 4px; margin: 20px 0; color: #991b1b; }
-    .info { background: #dbeafe; border-left: 4px solid #2563eb; padding: 15px; border-radius: 4px; margin: 20px 0; color: #1e40af; }
     .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 14px; }
   </style>
 </head>
@@ -1129,91 +1065,30 @@ function generateCancellationEmail(data: {
     <div class="header">
       <img src="https://www.sddumpingsolutions.com/logo.png" alt="SD Dumping Solutions" style="max-width: 180px; height: auto; margin-bottom: 16px;" />
       <h1>Booking Cancelled</h1>
-      <p style="margin: 10px 0 0 0; font-size: 16px;">Your booking has been cancelled</p>
     </div>
-
     <div class="content">
       <p>Hi ${data.customerName},</p>
-
-      <div class="alert">
-        <p style="margin: 0; font-weight: bold;">Your booking has been cancelled.</p>
-        ${data.reason ? `<p style="margin: 10px 0 0 0;">Reason: ${data.reason}</p>` : ''}
-      </div>
-
+      <p>Your booking has been cancelled. Here are the details:</p>
       <div class="card">
-        <h2>Cancelled Booking Details</h2>
-        <div class="detail-row">
-          <span class="label">Booking ID:</span>
-          <span class="value">#${data.bookingId.slice(0, 8).toUpperCase()}</span>
-        </div>
-        <div class="detail-row">
-          <span class="label">Container:</span>
-          <span class="value">${data.containerType}</span>
-        </div>
-        <div class="detail-row">
-          <span class="label">Start Date:</span>
-          <span class="value">${data.startDate}</span>
-        </div>
-        <div class="detail-row">
-          <span class="label">End Date:</span>
-          <span class="value">${data.endDate}</span>
-        </div>
-        <div class="detail-row">
-          <span class="label">Status:</span>
-          <span class="value" style="color: #dc2626; font-weight: bold;">CANCELLED</span>
-        </div>
+        <h2>📦 Booking Details</h2>
+        <div class="detail-row"><span class="label">Booking ID:</span><span class="value">#${data.bookingId.slice(0, 8)}</span></div>
+        <div class="detail-row"><span class="label">Container:</span><span class="value">${data.containerType}</span></div>
+        <div class="detail-row"><span class="label">Start Date:</span><span class="value">${data.startDate}</span></div>
+        <div class="detail-row"><span class="label">End Date:</span><span class="value">${data.endDate}</span></div>
+        ${data.reason ? `<div class="detail-row"><span class="label">Reason:</span><span class="value">${data.reason}</span></div>` : ''}
       </div>
-
-      <div class="info">
-        <p style="margin: 0; font-weight: bold;">Need to rebook?</p>
-        <p style="margin: 10px 0 0 0;">
-          If you'd like to schedule a new booking, please visit our website or give us a call. We're happy to help you find a time that works for you.
-        </p>
-      </div>
-
-      <p style="text-align: center; margin: 30px 0 10px 0; color: #6b7280;">
-        Questions? Contact us anytime - we're here to help!
-      </p>
+      <p style="color: #6b7280;">If you have any questions about this cancellation, please don't hesitate to contact us.</p>
     </div>
-
     <div class="footer">
       <p><strong>SD Dumping Solutions</strong></p>
-      <p>Professional Waste Management Services</p>
-      <p style="font-size: 12px; color: #9ca3af;">
-        Thank you for considering SD Dumping Solutions for your container rental needs.
-      </p>
+      <p style="font-size: 12px; color: #9ca3af;">Container Rental Services</p>
     </div>
   </div>
 </body>
 </html>
-  `
-}
-
-// Send booking cancellation email to customer
-export async function sendCancellationEmail(data: {
-  customerName: string
-  customerEmail: string
-  bookingId: string
-  containerType: string
-  startDate: string
-  endDate: string
-  reason?: string
-}) {
-  if (!transporter) {
-    console.warn('⚠️ Email not configured - skipping cancellation email')
-    return { success: true, skipped: true, reason: 'Email not configured' }
-  }
-
-  try {
-    await transporter.sendMail({
-      from: `"SD Dumping Solutions" <${process.env.SMTP_FROM}>`,
-      to: data.customerEmail,
-      cc: ['sandiegodumpingsolutions@gmail.com', 'diego@comcreate.org'],
-      subject: `Booking Cancelled - #${data.bookingId.slice(0, 8)}`,
-      html: generateCancellationEmail(data),
+      `,
     })
     console.log('✅ Cancellation email sent to:', data.customerEmail)
-
     return { success: true }
   } catch (error) {
     console.error('❌ Error sending cancellation email:', error)
@@ -1221,9 +1096,10 @@ export async function sendCancellationEmail(data: {
   }
 }
 
-// Generate booking extension email HTML
-function generateBookingExtensionEmail(data: {
+// Send booking extension email to customer
+export async function sendBookingExtensionEmail(data: {
   customerName: string
+  customerEmail: string
   bookingId: string
   containerType: string
   startDate: string
@@ -1233,7 +1109,17 @@ function generateBookingExtensionEmail(data: {
   additionalCost: number
   newTotalAmount: number
 }) {
-  return `
+  if (!isEmailConfigured) {
+    console.warn('⚠️ Email not configured - skipping extension email')
+    return { success: true, skipped: true, reason: 'Email not configured' }
+  }
+
+  try {
+    await sendEmail({
+      to: data.customerEmail,
+      cc: ['sandiegodumpingsolutions@gmail.com', 'diego@comcreate.org'],
+      subject: `Booking Extended - #${data.bookingId.slice(0, 8)}`,
+      html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -1250,8 +1136,7 @@ function generateBookingExtensionEmail(data: {
     .detail-row:last-child { border-bottom: none; }
     .label { font-weight: bold; color: #6b7280; }
     .value { color: #111827; }
-    .highlight { background: #dbeafe; border-left: 4px solid #2563eb; padding: 15px; border-radius: 4px; margin: 20px 0; color: #1e40af; }
-    .success { background: #d1fae5; border-left: 4px solid #059669; padding: 15px; border-radius: 4px; margin: 20px 0; color: #065f46; }
+    .info { background: #dbeafe; border-left: 4px solid #2563eb; padding: 15px; border-radius: 4px; margin: 20px 0; color: #1e40af; }
     .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 14px; }
   </style>
 </head>
@@ -1260,111 +1145,59 @@ function generateBookingExtensionEmail(data: {
     <div class="header">
       <img src="https://www.sddumpingsolutions.com/logo.png" alt="SD Dumping Solutions" style="max-width: 180px; height: auto; margin-bottom: 16px;" />
       <h1>📅 Booking Extended</h1>
-      <p style="margin: 10px 0 0 0; font-size: 16px;">Your rental period has been extended</p>
+      <p style="margin: 10px 0 0 0; font-size: 16px;">Your rental period has been updated</p>
     </div>
-
     <div class="content">
       <p>Hi ${data.customerName},</p>
-
-      <div class="success">
-        <p style="margin: 0; font-weight: bold;">Your booking has been extended!</p>
-        <p style="margin: 10px 0 0 0;">
-          We've extended your container rental by ${data.additionalDays} day${data.additionalDays > 1 ? 's' : ''}.
-        </p>
-      </div>
-
+      <p>Your booking has been extended. Here are the updated details:</p>
       <div class="card">
-        <h2>📦 Updated Booking Details</h2>
-        <div class="detail-row">
-          <span class="label">Booking ID:</span>
-          <span class="value">#${data.bookingId.slice(0, 8).toUpperCase()}</span>
-        </div>
-        <div class="detail-row">
-          <span class="label">Container:</span>
-          <span class="value">${data.containerType}</span>
-        </div>
-        <div class="detail-row">
-          <span class="label">Start Date:</span>
-          <span class="value">${data.startDate}</span>
-        </div>
-        <div class="detail-row">
-          <span class="label">Previous End Date:</span>
-          <span class="value" style="text-decoration: line-through; color: #9ca3af;">${data.previousEndDate}</span>
-        </div>
-        <div class="detail-row">
-          <span class="label">New End Date:</span>
-          <span class="value" style="color: #059669; font-weight: bold;">${data.newEndDate}</span>
-        </div>
+        <h2>📦 Booking Details</h2>
+        <div class="detail-row"><span class="label">Booking ID:</span><span class="value">#${data.bookingId.slice(0, 8)}</span></div>
+        <div class="detail-row"><span class="label">Container:</span><span class="value">${data.containerType}</span></div>
+        <div class="detail-row"><span class="label">Start Date:</span><span class="value">${data.startDate}</span></div>
+        <div class="detail-row"><span class="label">Previous End Date:</span><span class="value" style="text-decoration: line-through; color: #9ca3af;">${data.previousEndDate}</span></div>
+        <div class="detail-row"><span class="label">New End Date:</span><span class="value" style="color: #059669; font-weight: bold;">${data.newEndDate}</span></div>
       </div>
-
-      <div class="highlight">
-        <p style="margin: 0; font-weight: bold;">💳 Payment Information</p>
-        <p style="margin: 10px 0 0 0;">
-          The additional cost for the extension will be charged to your saved payment method, or you may be contacted by our team for payment.
-        </p>
+      <div class="info">
+        <p style="margin: 0; font-weight: bold;">💰 Pricing Update</p>
+        <p style="margin: 10px 0 0 0;">Additional days: ${data.additionalDays} (+$${data.additionalCost.toFixed(2)})</p>
+        <p style="margin: 5px 0 0 0; font-weight: bold;">New Total: $${data.newTotalAmount.toFixed(2)}</p>
       </div>
-
-      <p style="text-align: center; margin: 30px 0 10px 0; color: #6b7280;">
-        Questions? Contact us anytime - we're here to help!
-      </p>
+      <p style="color: #6b7280;">If you have any questions, please don't hesitate to contact us.</p>
     </div>
-
     <div class="footer">
       <p><strong>SD Dumping Solutions</strong></p>
-      <p>Professional Waste Management Services</p>
-      <p style="font-size: 12px; color: #9ca3af;">
-        Thank you for choosing SD Dumping Solutions!
-      </p>
+      <p style="font-size: 12px; color: #9ca3af;">Container Rental Services</p>
     </div>
   </div>
 </body>
 </html>
-  `
-}
-
-// Send booking extension email to customer
-export async function sendBookingExtensionEmail(data: {
-  customerName: string
-  customerEmail: string
-  bookingId: string
-  containerType: string
-  startDate: string
-  previousEndDate: string
-  newEndDate: string
-  additionalDays: number
-  additionalCost: number
-  newTotalAmount: number
-}) {
-  if (!transporter) {
-    console.warn('⚠️ Email not configured - skipping booking extension email')
-    return { success: true, skipped: true, reason: 'Email not configured' }
-  }
-
-  try {
-    await transporter.sendMail({
-      from: `"SD Dumping Solutions" <${process.env.SMTP_FROM}>`,
-      to: data.customerEmail,
-      cc: ['sandiegodumpingsolutions@gmail.com', 'diego@comcreate.org'],
-      subject: `📅 Booking Extended - #${data.bookingId.slice(0, 8)} - New End Date: ${data.newEndDate}`,
-      html: generateBookingExtensionEmail(data),
+      `,
     })
-    console.log('✅ Booking extension email sent to:', data.customerEmail)
-
+    console.log('✅ Extension email sent to:', data.customerEmail)
     return { success: true }
   } catch (error) {
-    console.error('❌ Error sending booking extension email:', error)
+    console.error('❌ Error sending extension email:', error)
     throw error
   }
 }
 
-// Generate Google review request email HTML
-function generateReviewRequestEmail(data: {
+// Send Google review request email after payment
+export async function sendReviewRequestEmail(data: {
   customerName: string
+  customerEmail: string
   bookingId: string
 }) {
-  const googleReviewUrl = 'https://search.google.com/local/writereview?placeid=ChIJe5BJ-qEYAygRZh7wBvm_CcA&source=g.page.m._&laa=merchant-review-solicitation'
+  if (!isEmailConfigured) {
+    console.warn('⚠️ Email not configured - skipping review request email')
+    return { success: true, skipped: true, reason: 'Email not configured' }
+  }
 
-  return `
+  try {
+    await sendEmail({
+      to: data.customerEmail,
+      subject: `How was your experience? - SD Dumping Solutions`,
+      html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -1375,12 +1208,7 @@ function generateReviewRequestEmail(data: {
     .header { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 30px; text-align: center; }
     .header h1 { margin: 0; font-size: 28px; }
     .content { background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; }
-    .card { background: white; padding: 25px; border-radius: 8px; margin: 20px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1); text-align: center; }
-    .stars { font-size: 48px; margin: 20px 0; }
-    .review-btn { display: inline-block; background: linear-gradient(135deg, #4285f4 0%, #3367d6 100%); color: white !important; padding: 16px 32px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 18px; margin: 20px 0; }
-    .review-btn:hover { opacity: 0.9; }
-    .google-logo { margin: 10px 0; }
-    .info { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; border-radius: 4px; margin: 20px 0; color: #92400e; }
+    .button { display: inline-block; background: #2563eb; color: white; padding: 15px 40px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-size: 16px; font-weight: bold; }
     .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 14px; }
   </style>
 </head>
@@ -1388,76 +1216,27 @@ function generateReviewRequestEmail(data: {
   <div class="container">
     <div class="header">
       <img src="https://www.sddumpingsolutions.com/logo.png" alt="SD Dumping Solutions" style="max-width: 180px; height: auto; margin-bottom: 16px;" />
-      <h1>Thank You! 🙏</h1>
-      <p style="margin: 10px 0 0 0; font-size: 16px;">We hope you had a great experience</p>
+      <h1>⭐ We'd Love Your Feedback!</h1>
     </div>
-
     <div class="content">
       <p>Hi ${data.customerName},</p>
-
-      <p>Thank you for choosing SD Dumping Solutions for your container rental needs! We truly appreciate your business.</p>
-
-      <div class="card">
-        <p class="stars">⭐⭐⭐⭐⭐</p>
-        <h2 style="color: #1f2937; margin: 0 0 15px 0;">How was your experience?</h2>
-        <p style="color: #6b7280; margin-bottom: 20px;">
-          Your feedback helps us improve and helps other customers find quality service. Would you take a moment to share your experience?
-        </p>
-
-        <a href="${googleReviewUrl}" class="review-btn" style="color: white;">
-          📝 Leave a Google Review
-        </a>
-
-        <p style="font-size: 12px; color: #9ca3af; margin-top: 20px;">
-          Click the button above to leave a review on Google
-        </p>
-      </div>
-
-      <div class="info">
-        <p style="margin: 0; font-weight: bold;">💡 Quick & Easy!</p>
-        <p style="margin: 10px 0 0 0;">
-          Leaving a review only takes about 30 seconds and makes a huge difference for our small business. We read every review!
-        </p>
-      </div>
-
-      <p style="text-align: center; margin: 30px 0 10px 0; color: #6b7280;">
-        Thank you again for your support! We look forward to serving you in the future.
+      <p>Thank you for choosing SD Dumping Solutions! We hope you had a great experience with our service.</p>
+      <p>Would you mind taking a moment to leave us a review on Google? Your feedback helps us improve and helps other customers find quality service.</p>
+      <p style="text-align: center; margin: 30px 0;">
+        <a href="https://g.page/r/sddumpingsolutions/review" class="button">Leave a Google Review</a>
       </p>
+      <p style="color: #6b7280; font-size: 14px;">Thank you for your time - it means a lot to us!</p>
     </div>
-
     <div class="footer">
       <p><strong>SD Dumping Solutions</strong></p>
-      <p>Professional Waste Management Services</p>
-      <p style="font-size: 12px; color: #9ca3af;">
-        San Diego County | (760) 270-0312
-      </p>
+      <p style="font-size: 12px; color: #9ca3af;">Container Rental Services</p>
     </div>
   </div>
 </body>
 </html>
-  `
-}
-
-// Send Google review request email to customer after payment is collected
-export async function sendReviewRequestEmail(data: {
-  customerName: string
-  customerEmail: string
-  bookingId: string
-}) {
-  if (!transporter) {
-    console.warn('⚠️ Email not configured - skipping review request email')
-    return { success: true, skipped: true, reason: 'Email not configured' }
-  }
-
-  try {
-    await transporter.sendMail({
-      from: `"SD Dumping Solutions" <${process.env.SMTP_FROM}>`,
-      to: data.customerEmail,
-      subject: `⭐ How was your experience with SD Dumping Solutions?`,
-      html: generateReviewRequestEmail(data),
+      `,
     })
     console.log('✅ Review request email sent to:', data.customerEmail)
-
     return { success: true }
   } catch (error) {
     console.error('❌ Error sending review request email:', error)
@@ -1465,3 +1244,33 @@ export async function sendReviewRequestEmail(data: {
   }
 }
 
+// Send payment receipt email to customer
+export async function sendPaymentReceiptEmail(data: {
+  customerName: string
+  customerEmail: string
+  bookingId: string
+  amount: number
+  description: string
+  transactionId: string
+  chargedDate: string
+}) {
+  if (!isEmailConfigured) {
+    console.warn('⚠️ Email not configured - skipping payment receipt email')
+    return { success: true, skipped: true, reason: 'Email not configured' }
+  }
+
+  try {
+    await sendEmail({
+      to: data.customerEmail,
+      cc: ['sandiegodumpingsolutions@gmail.com', 'diego@comcreate.org'],
+      subject: `💳 Payment Receipt - $${data.amount.toFixed(2)} - Booking #${data.bookingId.slice(0, 8)}`,
+      html: generatePaymentReceiptEmail(data),
+    })
+    console.log('✅ Payment receipt email sent to:', data.customerEmail)
+
+    return { success: true }
+  } catch (error) {
+    console.error('❌ Error sending payment receipt email:', error)
+    throw error
+  }
+}
