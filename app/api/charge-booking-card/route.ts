@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     // Get booking with payment method ID
     const { data: booking, error: bookingError } = await supabase
       .from('bookings')
-      .select('id, payment_method_id, user_id, total_amount, status')
+      .select('id, payment_method_id, user_id, total_amount, status, pricing_breakdown')
       .eq('id', bookingId)
       .single()
 
@@ -282,6 +282,7 @@ export async function POST(request: NextRequest) {
             description: description || `Charge for booking #${booking.id.slice(0, 8)}`,
             transactionId: paymentIntent.id,
             chargedDate: format(new Date(), "MMMM do, yyyy 'at' h:mm a"),
+            pricingBreakdown: booking.pricing_breakdown || null,
           })
           console.log('✅ [Charge Booking Card] Payment receipt email sent')
 
