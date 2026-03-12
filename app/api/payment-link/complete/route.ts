@@ -35,6 +35,7 @@ export async function POST(request: Request) {
           start_date,
           end_date,
           total_amount,
+          pricing_breakdown,
           status,
           container_types (
             name
@@ -167,6 +168,7 @@ export async function POST(request: Request) {
         startDate: format(parseLocalDate(booking.start_date), "MMMM do, yyyy"),
         endDate: format(parseLocalDate(booking.end_date), "MMMM do, yyyy"),
         totalAmount: booking.total_amount,
+        pricingBreakdown: booking.pricing_breakdown || null,
       })
     } catch (emailError) {
       console.error("Error sending customer confirmation email:", emailError)
@@ -181,6 +183,7 @@ export async function POST(request: Request) {
         bookingId: booking.id,
         containerType: booking.container_types.name,
         totalAmount: booking.total_amount,
+        pricingBreakdown: booking.pricing_breakdown || null,
       })
     } catch (emailError) {
       console.error("Error sending admin notification email:", emailError)
